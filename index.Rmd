@@ -1,0 +1,72 @@
+---
+title: "Untitled"
+author: "Drazzel Feliu"
+date: "7/2/2019"
+output: pdf_document
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(randomizr)
+library(data.table)
+```
+
+
+The first thing is to create enough test data in order to be able to fully reassign control & treatment groups. We'll start with 16 numbered observations, randomize the assignment of treatment, and randomize the outcome variable we intend to test. This will be our base for using randomized treatment assignments and identifying how to accurate perform the permutation inference test primarily.
+
+```{r Test Data}
+
+test <- tibble("obs"=1:16,
+               "treatment"=ifelse(randomNumbers(16,0,100,1)>50,1,0),
+               "outcome"=randomNumbers(16,0,20,1))
+```
+
+We have so far a truly random assignment of treatment and, for the purposes of this exercise strictly, a random series of outcomes. We can identify the treatment effect by taking the means of the two groups.
+
+```{r Sample Mean}
+test %>% group_by(treatment) %>% tally()
+test %>% group_by(treatment) %>% summarise(mean=mean(outcome))
+```
+
+We find that the treatment group had `r 15.85714-11.22222` more outcomes (in a discrete sense, ie: symptons of a disease, incidences of fraud, etc) than the control group. But for some limitation, we can no longer retest this. We can determine whether the outcome was statistically significant by reassigning treatment and control through each permutation, developing a series of means, and then testing our true mean against the artificial means in a distribution and identifying where it landed. 
+
+It's important to note that our original random treatment assignment resulted in 7 control observation and 9 treatment observations. In reassigning our treatments again, we need to keep that same balance of 9 control to 7 treatment. For 16 observations, this would result in the following number of possibilities: 11440
+
+```{r Combinations Math}
+
+comb <- function(n,r) {
+  num <- factorial(n)
+  den1 <- factorial(r)
+  den2 <- factorial(n-r)
+  return(num/(den1*den2))
+}
+
+comb(16,7)
+```
+
+
+```{r Treatment Reassignment}
+y <- do.call(CJ, replicate(16,0:1, FALSE)) 
+y <- mutate(y, check=rowSums(y))
+y <- filter(y, check==7)
+y$check <- NULL
+y <- as_tibble(transpose(y))
+
+colnames(y) <- paste0("perm_",1:ncol(y))
+
+#find the perm assignment that matches the original treatment assignment
+
+colmatch <- function(n) {
+  identical(test$treatment,y[,])
+}
+
+a <- as.data.frame(lapply(y,colmatch))
+
+
+
+
+
+```
+
+
+Now we'll attempt to scale our tests to much larger sizes than 16 observations.
