@@ -50,46 +50,46 @@ comb(16,treated)
 
 
 ```{r Treatment Reassignment}
-y <- do.call(CJ, replicate(16,0:1, FALSE))
-y <- y %>% mutate(check=rowSums(y)) %>% filter(., check == treated)
-y$check <- NULL
-y <- as_tibble(transpose(y))
+perm <- do.call(CJ, replicate(16,0:1, FALSE))
+perm <- perm %>% mutate(check=rowSums(perm)) %>% filter(., check == treated)
+perm$check <- NULL
+perm <- as_tibble(transpose(perm))
 
-colnames(y) <- paste0("perm_",1:ncol(y))
+colnames(perm) <- paste0("perm_",1:ncol(perm))
 
 #find the perm assignment that matches the original treatment assignment
 
 colmatch <- function(n){identical(test$treatment,n)}
 
-a <- as.data.frame(lapply(y,colmatch))
+consistencycheck <- as.data.frame(lapply(perm,colmatch))
 
 #--------------
 
 # This part below will be easy to find the matching permutated assignment with the real assignment
-a[2,] <- colnames(a)
-a <- as.data.frame(transpose(a))
-user <- a %>% filter(V1=="TRUE")
+consistencycheck[2,] <- colnames(consistencycheck)
+consistencycheck <- as.data.frame(transpose(consistencycheck))
+consistencycheck <- consistencycheck %>% filter(V1=="TRUE")
 
 ```
 
 ```{r}
 # merge the data sets
 
-cube <- cbind(test,y)
+matrix <- cbind(test,perm)
 
 # group by and calculate the sample means (11440 test cases * 2 group means = 22880 observations)
 # need to scale this process to 11440 operations
 
-meanShift <- function(x){as.data.frame(tapply(cube$outcome, x, mean))}
+mean_generator <- function(x){as.data.frame(tapply(matrix$outcome, x, mean))}
 
-fakedistro <- as.data.frame(lapply(cube[c(2,4:ncol(cube))],meanShift))
+perm_distro <- as.data.frame(lapply(matrix[c(2,4:ncol(matrix))],mean_generator))
 
-fd <- as.data.frame(transpose(fakedistro))
-fd$name <- colnames(cube[c(2,4:ncol(cube))])
+perm_distro <- as.data.frame(transpose(perm_distro))
+perm_distro$name <- colnames(matrix[c(2,4:ncol(matrix))])
 
-fd$diff <- fd$V2-fd$V1
+perm_distro$diff <- perm_distro$V2-perm_distro$V1
 
-actualtreatment <- unlist(fd %>% filter(name=="treatment") %>% select(diff))
+actualtreatment <- unlist(perm_distro %>% filter(name=="treatment") %>% select(diff))
 
-fd %>% filter(name!="treatment") %>% ggplot(.,aes(diff)) + geom_histogram() + geom_vline(xintercept=mean(fd$diff)) + geom_vline(xintercept = 2*sd(fd$diff)) + geom_vline(xintercept = actualtreatment, linetype="dashed")
+perm_distro %>% filter(name!="treatment") %>% ggplot(.,aes(diff)) + geom_histogram() + geom_vline(xintercept=mean(perm_distro$diff)) + geom_vline(xintercept = 2*sd(perm_distro$diff)) + geom_vline(xintercept = actualtreatment, linetype="dashed")
 ```
