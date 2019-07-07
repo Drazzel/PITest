@@ -6,19 +6,23 @@ output: pdf_document
 ---
 
 ```{r, include=FALSE}
+rm(list=ls())
 library(tidyverse)
 library(randomizr)
 library(data.table)
 ```
 
-
 The first thing is to create enough test data in order to be able to fully reassign control & treatment groups. We'll start with 16 numbered observations, randomize the assignment of treatment, and randomize the outcome variable we intend to test. This will be our base for using randomized treatment assignments and identifying how to accurate perform the permutation inference test primarily.
 
 ```{r Test Data}
-
 test <- tibble("obs"=1:16,
                "treatment"=ifelse(randomNumbers(16,0,100,1)>50,1,0),
                "outcome"=randomNumbers(16,0,20,1))
+
+treated <- sum(test$treatment)
+
+test$treatment <- as.integer(test$treatment)
+test$outcome <- as.integer(test$outcome)
 ```
 
 We have so far a truly random assignment of treatment and, for the purposes of this exercise strictly, a random series of outcomes. We can identify the treatment effect by taking the means of the two groups.
@@ -28,9 +32,9 @@ test %>% group_by(treatment) %>% tally()
 test %>% group_by(treatment) %>% summarise(mean=mean(outcome))
 ```
 
-We find that the treatment group had `r 15.85714-11.22222` more outcomes (in a discrete sense, ie: symptons of a disease, incidences of fraud, etc) than the control group. But for some limitation, we can no longer retest this. We can determine whether the outcome was statistically significant by reassigning treatment and control through each permutation, developing a series of means, and then testing our true mean against the artificial means in a distribution and identifying where it landed. 
+Let's presume some limitation, that does not allow us to retest this experiment. We can determine whether the outcome was statistically significant by reassigning treatment and control through each permutation, developing a series of means, and then testing our true mean against the artificial means in a distribution and identifying where it landed. 
 
-It's important to note that our original random treatment assignment resulted in 7 control observation and 9 treatment observations. In reassigning our treatments again, we need to keep that same balance of 9 control to 7 treatment. For 16 observations, this would result in the following number of possibilities: 11440
+It's important to note that our random treatment assignment resulted in 9 control observation and 7 treatment observations. In reassigning our treatments again, we need to keep that same balance of 9 control to 7 treatment. For 16 observations, this would result in the following number of possibilities: 11440
 
 ```{r Combinations Math}
 
@@ -41,14 +45,13 @@ comb <- function(n,r) {
   return(num/(den1*den2))
 }
 
-comb(16,7)
+comb(16,treated)
 ```
 
 
 ```{r Treatment Reassignment}
-y <- do.call(CJ, replicate(16,0:1, FALSE)) 
-y <- mutate(y, check=rowSums(y))
-y <- filter(y, check==7)
+y <- do.call(CJ, replicate(16,0:1, FALSE))
+y <- y %>% mutate(check=rowSums(y)) %>% filter(., check == treated)
 y$check <- NULL
 y <- as_tibble(transpose(y))
 
@@ -56,17 +59,37 @@ colnames(y) <- paste0("perm_",1:ncol(y))
 
 #find the perm assignment that matches the original treatment assignment
 
-colmatch <- function(n) {
-  identical(test$treatment,y[,])
-}
+colmatch <- function(n){identical(test$treatment,n)}
 
 a <- as.data.frame(lapply(y,colmatch))
 
+#--------------
 
-
-
+# This part below will be easy to find the matching permutated assignment with the real assignment
+a[2,] <- colnames(a)
+a <- as.data.frame(transpose(a))
+user <- a %>% filter(V1=="TRUE")
 
 ```
 
+```{r}
+# merge the data sets
 
-Now we'll attempt to scale our tests to much larger sizes than 16 observations.
+cube <- cbind(test,y)
+
+# group by and calculate the sample means (11440 test cases * 2 group means = 22880 observations)
+# need to scale this process to 11440 operations
+
+meanShift <- function(x){as.data.frame(tapply(cube$outcome, x, mean))}
+
+fakedistro <- as.data.frame(lapply(cube[c(2,4:ncol(cube))],meanShift))
+
+fd <- as.data.frame(transpose(fakedistro))
+fd$name <- colnames(cube[c(2,4:ncol(cube))])
+
+fd$diff <- fd$V2-fd$V1
+
+actualtreatment <- unlist(fd %>% filter(name=="treatment") %>% select(diff))
+
+fd %>% filter(name!="treatment") %>% ggplot(.,aes(diff)) + geom_histogram() + geom_vline(xintercept=mean(fd$diff)) + geom_vline(xintercept = 2*sd(fd$diff)) + geom_vline(xintercept = actualtreatment, linetype="dashed")
+```
