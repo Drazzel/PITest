@@ -11,6 +11,7 @@ library(tidyverse)
 library(random)
 library(data.table)
 library(permutations)
+library(spatstat.utils)
 ```
 
 The first thing is to create enough test data in order to be able to fully reassign control & treatment groups. We'll start with 16 numbered observations, randomize the assignment of treatment, and randomize the outcome variable we intend to test. This will be our base for using randomized treatment assignments and identifying how to accurately perform the permutation inference test primarily.
@@ -93,13 +94,30 @@ perm_distro$name <- colnames(matrix[c(2,4:ncol(matrix))])
 perm_distro$diff <- perm_distro$V2-perm_distro$V1
 
 actualtreatment <- unlist(perm_distro %>% filter(name=="treatment") %>% select(diff))
+
+perm_distro <- perm_distro  %>%  filter(name!="treatment")
 ```
 
-```{r Distribution & Testing}
+```{r Significance Testing}
+percentile <- ecdf(perm_distro$diff)(actualtreatment)*100
+
+stat_range <- c(ecdf(perm_distro$diff)(-2*sd(perm_distro$diff))*100,ecdf(perm_distro$diff)(2*sd(perm_distro$diff))*100)
+
+quantile(perm_distro$diff,percentile/100,type = 3)==actualtreatment
+
+ifelse(check.in.range(percentile,stat_range),"Not Significant","Significant")
+```
+
+```{r Visual Distribution}
 perm_distro %>% filter(name!="treatment") %>% ggplot(.,aes(diff)) + geom_histogram(bins=30) +
-  geom_vline(xintercept=mean(perm_distro$diff)) + geom_vline(xintercept = -2*sd(perm_distro$diff)) + 
-  geom_vline(xintercept = 2*sd(perm_distro$diff)) + geom_vline(xintercept = actualtreatment, linetype="dashed", color="red")
+  geom_vline(xintercept=mean(perm_distro$diff),
+  color="blue") + geom_vline(xintercept = -2*sd(perm_distro$diff), color="green") + 
+  geom_vline(xintercept = 2*sd(perm_distro$diff),color="green") + geom_vline(xintercept = actualtreatment, linetype="dashed", color="red")
 ```
 
+Attempted Regression
 
-
+```{r}
+reg <- lm(outcome~treatment, test)
+summary(reg)
+```
