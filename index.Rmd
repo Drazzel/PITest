@@ -103,16 +103,19 @@ percentile <- ecdf(perm_distro$diff)(actualtreatment)*100
 
 stat_range <- c(ecdf(perm_distro$diff)(-2*sd(perm_distro$diff))*100,ecdf(perm_distro$diff)(2*sd(perm_distro$diff))*100)
 
+one_tailed <- unlist(quantile(perm_distro$diff,.95,type = 3))
+
 quantile(perm_distro$diff,percentile/100,type = 3)==actualtreatment
 
-ifelse(check.in.range(percentile,stat_range),"Not Significant","Significant")
+ifelse(check.in.range(percentile,stat_range, fatal = FALSE)==TRUE,"Not Significant","Significant")
 ```
 
 ```{r Visual Distribution}
-perm_distro %>% filter(name!="treatment") %>% ggplot(.,aes(diff)) + geom_histogram(bins=30) +
+perm_distro %>% filter(name!="treatment") %>% ggplot(.,aes(diff)) + geom_histogram(bins=75) +
   geom_vline(xintercept=mean(perm_distro$diff),
   color="blue") + geom_vline(xintercept = -2*sd(perm_distro$diff), color="green") + 
-  geom_vline(xintercept = 2*sd(perm_distro$diff),color="green") + geom_vline(xintercept = actualtreatment, linetype="dashed", color="red")
+  geom_vline(xintercept = 2*sd(perm_distro$diff),color="green") + geom_vline(xintercept = actualtreatment, linetype="dashed", color="red") + 
+  geom_vline(xintercept = one_tailed, color="black")
 ```
 
 Attempted Regression
