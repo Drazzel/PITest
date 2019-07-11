@@ -17,7 +17,7 @@ library(spatstat.utils)
 The first thing is to create enough test data in order to be able to fully reassign control & treatment groups. We'll start with 16 numbered observations, randomize the assignment of treatment, and randomize the outcome variable we intend to test. This will be our base for using randomized treatment assignments and identifying how to accurately perform the permutation inference test primarily.
 
 ```{r Test Data}
-x <- 16
+x <- 26
 
 test <- tibble("obs"=1:x,
                "treatment"=ifelse(randomNumbers(x,0,100,1)>50,1,0),
@@ -25,8 +25,8 @@ test <- tibble("obs"=1:x,
 
 treated <- sum(test$treatment)
 
-test$treatment <- as.integer(test$treatment)
-test$outcome <- as.integer(test$outcome)
+test$treatment <- as.numeric(test$treatment)
+test$outcome <- as.numeric(test$outcome)
 ```
 
 We have so far a truly random assignment of treatment and, for the purposes of this exercise strictly, a random series of outcomes. We can identify the treatment effect by taking the means of the two groups.
@@ -54,12 +54,12 @@ comb(x,treated)
 
 
 ```{r Treatment Reassignment}
-perm <- do.call(CJ, replicate(x,0:1, FALSE))
-perm <- perm %>% mutate(check=rowSums(perm)) %>% filter(., check == treated)
-perm$check <- NULL
-perm <- as_tibble(transpose(perm))
+perm <- as_tibble(combn(x, treated))
+perm_assign <- function (x){ifelse(test$obs %in% x,1,0)}
+perm <- as.data.frame(lapply(perm,perm_assign))
 
 colnames(perm) <- paste0("perm_",1:ncol(perm))
+
 
 #find the perm assignment that matches the original treatment assignment
 
@@ -73,7 +73,6 @@ consistencycheck <- as.data.frame(lapply(perm,colmatch))
 consistencycheck[2,] <- colnames(consistencycheck)
 consistencycheck <- as.data.frame(transpose(consistencycheck))
 consistencycheck <- consistencycheck %>% filter(V1=="TRUE")
-
 ```
 
 ```{r Generating Distribution}
