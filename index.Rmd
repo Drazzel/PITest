@@ -4,6 +4,12 @@ author: "Drazzel Feliu"
 date: "7/2/2019"
 output: pdf_document
 ---
+```{r Timer Tracker}
+choose_16_8 <- "8.58 seconds"
+choose_18_9 <- "23.6 seconds"
+choose_20_10 <- "50.56 seconds"
+choose_22_11 <- "4 minutes and 56 seconds"
+```
 
 ```{r, include=FALSE}
 rm(list=ls())
@@ -17,7 +23,7 @@ library(spatstat.utils)
 The first thing is to create enough test data in order to be able to fully reassign control & treatment groups. We'll start with 16 numbered observations, randomize the assignment of treatment, and randomize the outcome variable we intend to test. This will be our base for using randomized treatment assignments and identifying how to perform the permutation inference test primarily.
 
 ```{r Test Data}
-x <- 16
+x <- 22
 
 test <- tibble("obs"=1:x,
                "treatment"=ifelse(randomNumbers(x,0,100,1)>50,1,0),
@@ -106,7 +112,9 @@ one_tailed <- unlist(quantile(perm_distro$diff,.95,type = 3))
 
 quantile(perm_distro$diff,percentile/100,type = 3)==actualtreatment
 
-ifelse(check.in.range(percentile,stat_range, fatal = FALSE)==TRUE,"Not Significant","Significant")
+two_tailed_test <- ifelse(check.in.range(percentile,stat_range, fatal = FALSE)==TRUE,"Not Significant","Significant")
+
+one_tailed_test <- ifelse(percentile > 95,"Significant","Not Significant")
 ```
 
 ```{r Visual Distribution}
